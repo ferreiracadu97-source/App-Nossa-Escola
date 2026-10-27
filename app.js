@@ -1,10 +1,12 @@
 (() => {
 const $=id=>document.getElementById(id), cfg=window.APP_CONFIG||{};
 let sb,user,profile,tab="home";
+ const OWNER_ID="575779b7-dc46-4252-b362-c9dc94bf0a68";
+const isOwner=()=>user?.id===OWNER_ID;
 const labels={teacher:"Professor(a)",professor:"Professor(a)",professora:"Professor(a)",director:"Direção",diretor:"Direção",diretora:"Direção",admin:"Administrador(a)",administrator:"Administrador(a)",guardian:"Responsável",responsavel:"Responsável",responsável:"Responsável",parent:"Responsável",student:"Aluno(a)",aluno:"Aluno(a)",aluna:"Aluno(a)"};
 function normRole(raw){let r=String(raw||"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[\s-]+/g,"_");const map={professor:"teacher",professora:"teacher",docente:"teacher",diretor:"director",diretora:"director",direcao:"director",coordenador:"director",coordenadora:"director",administrador:"admin",administradora:"admin",responsavel:"guardian",pai:"guardian",mae:"guardian",encarregado:"guardian",encarregada:"guardian",aluno:"student",aluna:"student",estudante:"student"};return map[r]||r||"guardian"}
-const staff=()=>["teacher","director","admin"].includes(normRole(profile?.role));
-const admin=()=>["director","admin"].includes(normRole(profile?.role));
+const staff=()=>isOwner()||["teacher","director","admin"].includes(normRole(profile?.role));
+const admin=()=>isOwner()||["director","admin"].includes(normRole(profile?.role));
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const say=(s,err=false,where="appmsg")=>{const e=$(where);e.textContent=s||"";e.classList.toggle("error",!!err)};
 const roleLabel=r=>labels[normRole(r)]||String(r||"Acesso pendente");
@@ -223,7 +225,7 @@ if (tab === "grades") {
  if(tab==="users"&&admin()){let rows=await load("profiles");c.innerHTML=`<h2>Perfis de usuários</h2><p class="muted">Ajuste os cargos em Supabase → Editor de tabelas → profiles. O usuário não pode mudar o próprio cargo.</p>`+cards(rows,"full_name",r=>r.email||"",r=>roleLabel(r.role))}
  }catch(e){c.innerHTML=`<div class="empty"><b>Não foi possível carregar esta área.</b><p>${esc(friendly(e))}</p></div>`}
 }
-async function show(session){if(!session){$("auth").hidden=false;$("app").hidden=true;return}user=session.user;await getProfile();$("auth").hidden=true;$("app").hidden=false;$("hello").textContent=`Olá, ${profile.full_name||user.email}!`;$("who").textContent=`${user.email} · ${roleLabel(profile.role)}`;
+async function show(session){if(!session){$("auth").hidden=false;$("app").hidden=true;return}user=session.user;await getProfile();$("auth").hidden=true;$("app").hidden=false$("hello").innerHTML=`Olá, ${esc(profile.full_name||user.email)}! ${isOwner()?'<span class="owner-badge">👑 DONO</span>':""}`;
  const isRoleUnknown=!labels[normRole(profile.role)];$("role-alert").hidden=!isRoleUnknown;if(isRoleUnknown)$("role-alert").textContent="Seu perfil tem um cargo não reconhecido. Peça à direção para corrigir a coluna role na tabela profiles.";
  tab="home";await render()}
 async function init(){
