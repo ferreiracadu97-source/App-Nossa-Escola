@@ -19,18 +19,78 @@ async function getProfile(){
  profile.role=normRole(profile.role);
 }
 async function load(table, order="created_at"){const {data,error}=await sb.from(table).select("*").order(order,{ascending:false}).limit(100);if(error)throw error;return data||[]}
-function form(title,fields,button="Salvar"){
- return `<div class="formbox"><h3>${title}</h3><form class="entryform">${fields.map(f=>`<label>${f.label}${f.type==="textarea"?`<textarea name="${f.name}" ${f.required===false?"":"required"}></textarea>`:`<input name="${f.name}" type="${f.type||"text"}" ${f.required===false?"":"required"} ${f.step?`step="${f.step}"`:""}>`}</label>`).join("")}<button>${button}</button></form></div>`
+
+function form(title, fields, button = "Salvar") {
+  return `<div class="formbox"><h3>${title}</h3><form class="entryform">${
+    fields.map(f => `<label>${f.label}${
+      f.type === "textarea"
+        ? `<textarea name="${f.name}" ${f.required === false ? "" : "required"}></textarea>`
+        : f.type === "select"
+          ? `<select name="${f.name}" ${f.required === false ? "" : "required"}>
+              <option value="">Selecione...</option>
+              ${(f.options || []).map(o =>
+                `<option value="${o.value}">${o.label}</option>`
+              ).join("")}
+            </select>`
+          : `<input name="${f.name}" type="${f.type || "text"}" ${f.required === false ? "" : "required"} ${f.step ? `step="${f.step}"` : ""}>`
+    }</label>`).join("")
+  }<button>${button}</button></form></div>`;
 }
+
 function cards(rows,title,body,meta){return rows.length?rows.map(r=>`<article class="card"><h3>${esc(r[title]||"Sem título")}</h3><p>${esc(typeof body==="function"?body(r):(r[body]||""))}</p><div class="meta">${esc(typeof meta==="function"?meta(r):(r[meta]||""))}</div></article>`).join(""):`<div class="empty">Ainda não há registros.</div>`}
-async function insert(formEl,table,map,extra={}){
- const btn=formEl.querySelector("button");btn.disabled=true;
- try{const fd=new FormData(formEl),row={...extra};for(const [field,col] of Object.entries(map)){let v=fd.get(field);if(v==="")v=null;row[col]=v}
- if(["notices","school_events","school_files","attendance","grades","tasks"].includes(table))row.author_id=user.id;
- if(table==="messages")row.sender_id=user.id;
- const {error}=await sb.from(table).insert(row);if(error)throw error;say("Salvo com sucesso!");await render()
- }catch(e){say(friendly(e),true)}finally{btn.disabled=false}
+
+async function insert(formEl, table, map, extra = {}) {
+  const btn = formEl.querySelector("button");
+  btn.disabled = true;
+
+  try {
+    const fd = new FormData(formEl);
+    const row = { ...extra };
+
+    for (const [field, col] of Object.entries(map)) {
+      let v = fd.get(field);
+      if (v === "") v = null;
+      row[col] = v;
+    }
+
+    if (map.student_id) {
+      const select = formEl.elements.namedItem("student_id");
+      if (!select || !select.value) {
+        throw Error("Selecione um aluno.");
+      }
+
+      row.student_id = select.value;
+      row.student_name =
+        select.options[select.selectedIndex].text;
+    }
+
+    if ([
+      "notices",
+      "school_events",
+      "school_files",
+      "attendance",
+      "grades",
+      "tasks"
+    ].includes(table)) {
+      row.author_id = user.id;
+    }
+
+    if (table === "messages") {
+      row.sender_id = user.id;
+    }
+
+    const { error } = await sb.from(table).insert(row);
+    if (error) throw error;
+
+    say("Salvo com sucesso!");
+    await render();
+  } catch (e) {
+    say(friendly(e), true);
+  } finally {
+    btn.disabled = false;
+  }
 }
+
 function friendly(e){let m=e?.message||String(e);if(/schema cache|does not exist|could not find the table/i.test(m))return "A tabela necessária não existe neste banco. Confira o arquivo MIGRACAO_SUPABASE.sql incluído no ZIP.";if(/row-level security|permission denied|not allowed/i.test(m))return "O banco bloqueou esta ação por permissão. Confira se o perfil foi atribuído corretamente e se a migração SQL foi executada.";return m}
 function bind(table,map,extra={}){const f=$("content").querySelector(".entryform");if(f)f.addEventListener("submit",e=>{e.preventDefault();insert(f,table,map,extra)})}
 async function render(){
