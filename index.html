@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#14532d">
+<title>App Nossa Escola</title><link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script defer src="app.js"></script>
+</head>
+<body>
+<header class="topbar"><div class="logo">NE</div><div><b>App Nossa Escola</b><small>Escola Municipal Indígena Francisco Farias</small></div></header>
+<main class="wrap">
+<section id="auth" class="panel auth"><p class="eyebrow">ÁREA ESCOLAR</p><h1>Bem-vindo(a)!</h1><p class="muted">Entre na sua conta para acessar as informações da escola.</p>
+<label>E-mail<input id="email" type="email" autocomplete="email" placeholder="seu e-mail"></label><label>Senha<input id="password" type="password" autocomplete="current-password" placeholder="Sua senha"></label>
+<div class="row"><button id="login">Entrar</button><button id="signup" class="secondary">Criar conta</button></div><button id="reset" class="textbtn">Esqueci minha senha</button><p id="authmsg" class="msg"></p>
+<p class="small muted">A criação de conta começa com acesso de responsável até a direção atribuir o perfil correto. Nunca compartilhe sua senha.</p></section>
+<section id="app" hidden>
+<div class="panel welcome"><div><p class="eyebrow">PAINEL ESCOLAR</p><h1 id="hello">Olá!</h1><p id="who" class="muted"></p></div><button id="logout" class="secondary">Sair</button></div>
+<div id="role-alert" class="notice" hidden></div><nav id="nav" class="tabs"></nav><section id="content" class="panel content"></section><p id="appmsg" class="msg"></p><footer>App Nossa Escola · Use dados de teste até validar as permissões.</footer>
+</section></main>
+</body></html>
