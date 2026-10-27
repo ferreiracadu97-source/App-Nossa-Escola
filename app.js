@@ -103,8 +103,122 @@ async function render(){
  if(tab==="events"){let rows=await load("school_events");c.innerHTML=`<h2>Calendário escolar</h2><p class="muted">Reuniões, provas, festas e datas importantes.</p>`+(staff()?form("Cadastrar evento",[{name:"title",label:"Nome do evento"},{name:"event_date",label:"Data e hora",type:"datetime-local"},{name:"description",label:"Descrição",type:"textarea",required:false}]):"")+cards(rows,"title","description",r=>`Data: ${when(r.event_date)}`);if(staff())bind("school_events",{title:"title",event_date:"event_date",description:"description"})}
  if(tab==="messages"){let rows=await load("messages");c.innerHTML=`<h2>Mensagens</h2><p class="muted">Mural básico para comunicação entre usuários autenticados. Não é chat privado.</p>`+form("Enviar mensagem",[{name:"content",label:"Mensagem",type:"textarea"}])+cards(rows,"sender_name","content",r=>when(r.created_at));bind("messages",{content:"content"},{sender_name:profile.full_name||user.email})}
  if(tab==="files"){let rows=await load("school_files");c.innerHTML=`<h2>Documentos e arquivos</h2><p class="muted">Cadastro de links para documentos. Use somente links autorizados.</p>`+(staff()?form("Adicionar documento",[{name:"title",label:"Nome do documento"},{name:"file_url",label:"Link do arquivo",type:"url"},{name:"description",label:"Descrição",required:false}]):"")+cards(rows,"title",r=>r.description||r.file_url,r=>r.file_url||"");if(staff())bind("school_files",{title:"title",file_url:"file_url",description:"description"})}
- if(tab==="attendance"){let rows=await load("attendance");c.innerHTML=`<h2>Frequência dos alunos</h2><p class="muted">Somente equipe escolar pode registrar. Não use dados reais até configurar acesso por aluno/responsável.</p>`+(staff()?form("Registrar frequência",[{name:"student_name",label:"Nome do aluno"},{name:"attendance_date",label:"Data",type:"date"},{name:"status",label:"Situação (presente/ausente)"},{name:"notes",label:"Observação",required:false,type:"textarea"}]):"")+cards(rows,"student_name",r=>r.notes||"",r=>`${r.attendance_date||""} · ${r.status||""}`);if(staff())bind("attendance",{student_name:"student_name",attendance_date:"attendance_date",status:"status",notes:"notes"})}
- if(tab==="grades"){let rows=await load("grades");c.innerHTML=`<h2>Notas e boletim</h2><p class="muted">Área inicial para notas. A privacidade por aluno precisa ser ajustada antes de usar dados reais.</p>`+(staff()?form("Lançar nota",[{name:"student_name",label:"Nome do aluno"},{name:"subject",label:"Disciplina"},{name:"grade",label:"Nota",type:"number",step:"0.01"},{name:"term",label:"Bimestre/período"}]):"")+cards(rows,"student_name",r=>`${r.subject}: ${r.grade}`,r=>r.term||"");if(staff())bind("grades",{student_name:"student_name",subject:"subject",grade:"grade",term:"term"})}
+ 
+if (tab === "attendance") {
+  let rows = await load("attendance");
+  let studentOptions = [];
+
+  if (staff()) {
+    const { data, error } = await sb
+      .from("profiles")
+      .select("id, full_name, email")
+      .eq("role", "student")
+      .order("full_name");
+
+    if (error) throw error;
+
+    studentOptions = (data || []).map(p => ({
+      value: p.id,
+      label: esc(p.full_name || p.email || "Aluno sem nome")
+    }));
+  }
+
+  c.innerHTML =
+    `<h2>Frequência dos alunos</h2>
+     <p class="muted">Selecione a conta correta do aluno para registrar a frequência.</p>` +
+    (staff()
+      ? form("Registrar frequência", [
+          {
+            name: "student_id",
+            label: "Aluno",
+            type: "select",
+            options: studentOptions
+          },
+          { name: "attendance_date", label: "Data", type: "date" },
+          { name: "status", label: "Situação (presente/ausente)" },
+          {
+            name: "notes",
+            label: "Observação",
+            required: false,
+            type: "textarea"
+          }
+        ])
+      : "") +
+    cards(
+      rows,
+      "student_name",
+      r => r.notes || "",
+      r => `${r.attendance_date || ""} · ${r.status || ""}`
+    );
+
+  if (staff()) {
+    bind("attendance", {
+      student_id: "student_id",
+      attendance_date: "attendance_date",
+      status: "status",
+      notes: "notes"
+    });
+  }
+}
+
+ 
+if (tab === "grades") {
+  let rows = await load("grades");
+  let studentOptions = [];
+
+  if (staff()) {
+    const { data, error } = await sb
+      .from("profiles")
+      .select("id, full_name, email")
+      .eq("role", "student")
+      .order("full_name");
+
+    if (error) throw error;
+
+    studentOptions = (data || []).map(p => ({
+      value: p.id,
+      label: esc(p.full_name || p.email || "Aluno sem nome")
+    }));
+  }
+
+  c.innerHTML =
+    `<h2>Notas e boletim</h2>
+     <p class="muted">Selecione a conta correta do aluno antes de lançar uma nota.</p>` +
+    (staff()
+      ? form("Lançar nota", [
+          {
+            name: "student_id",
+            label: "Aluno",
+            type: "select",
+            options: studentOptions
+          },
+          { name: "subject", label: "Disciplina" },
+          {
+            name: "grade",
+            label: "Nota",
+            type: "number",
+            step: "0.01"
+          },
+          { name: "term", label: "Bimestre/período" }
+        ])
+      : "") +
+    cards(
+      rows,
+      "student_name",
+      r => `${r.subject}: ${r.grade}`,
+      r => r.term || ""
+    );
+
+  if (staff()) {
+    bind("grades", {
+      student_id: "student_id",
+      subject: "subject",
+      grade: "grade",
+      term: "term"
+    });
+  }
+}
+
  if(tab==="tasks"){let rows=await load("tasks");c.innerHTML=`<h2>Atividades e tarefas</h2><p class="muted">Atividades e prazos publicados pela escola.</p>`+(staff()?form("Cadastrar atividade",[{name:"title",label:"Atividade"},{name:"description",label:"Descrição",type:"textarea",required:false},{name:"due_date",label:"Prazo",type:"date",required:false}]):"")+cards(rows,"title","description",r=>`Prazo: ${r.due_date||"não definido"}`);if(staff())bind("tasks",{title:"title",description:"description",due_date:"due_date"})}
  if(tab==="users"&&admin()){let rows=await load("profiles");c.innerHTML=`<h2>Perfis de usuários</h2><p class="muted">Ajuste os cargos em Supabase → Editor de tabelas → profiles. O usuário não pode mudar o próprio cargo.</p>`+cards(rows,"full_name",r=>r.email||"",r=>roleLabel(r.role))}
  }catch(e){c.innerHTML=`<div class="empty"><b>Não foi possível carregar esta área.</b><p>${esc(friendly(e))}</p></div>`}
