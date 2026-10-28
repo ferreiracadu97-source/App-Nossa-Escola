@@ -12,7 +12,7 @@ const say=(s,err=false,where="appmsg")=>{const e=$(where);e.textContent=s||"";e.
 const roleLabel=r=>labels[normRole(r)]||String(r||"Acesso pendente");
 function when(s){if(!s)return "";let d=new Date(s);return isNaN(d)?esc(s):d.toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}
 function staffTabs(){return [
-{id:"home",label:"Início"},{id:"notices",label:"Avisos"},{id:"events",label:"Calendário"},{id:"messages",label:"Mensagens"},{id:"files",label:"Documentos"},{id:"attendance",label:"Frequência"},{id:"grades",label:"Notas/boletim"},{id:"tasks",label:"Atividades"},...(admin()?[{id:"users",label:"Usuários"}]:[])
+{id:"home",label:"Início"},{id:"account",label:"Minha conta"},{id:"notices",label:"Avisos"},{id:"events",label:"Calendário"},{id:"messages",label:"Mensagens"},{id:"files",label:"Documentos"},{id:"attendance",label:"Frequência"},{id:"grades",label:"Notas/boletim"},{id:"tasks",label:"Atividades"},...(admin()?[{id:"users",label:"Usuários"}]:[])
 ]}
 async function getProfile(){
  const {data,error}=await sb.from("profiles").select("*").eq("id",user.id).maybeSingle();
@@ -39,7 +39,13 @@ function form(title, fields, button = "Salvar") {
   }<button>${button}</button></form></div>`;
 }
 
-function cards(rows,title,body,meta){return rows.length?rows.map(r=>`<article class="card"><h3>${esc(r[title]||"Sem título")}</h3><p>${esc(typeof body==="function"?body(r):(r[body]||""))}</p><div class="meta">${esc(typeof meta==="function"?meta(r):(r[meta]||""))}</div></article>`).join(""):`<div class="empty">Ainda não há registros.</div>`}
+const OWNER_BADGE_MARKER="__OWNER_BADGE_MARKER__";
+function authorMeta(row,idField,nameField,dateValue){
+  const owner=(row[idField]===OWNER_ID);
+  const name=row[nameField]||(row[idField]===user?.id?profile?.full_name:"")||"Escola";
+  return `${name}${owner?OWNER_BADGE_MARKER:""}${dateValue?` · ${when(dateValue)}`:""}`;
+}
+function cards(rows,title,body,meta){return rows.length?rows.map(r=>{const rawMeta=typeof meta==="function"?meta(r):(r[meta]||"");const safeMeta=esc(rawMeta).replaceAll(esc(OWNER_BADGE_MARKER),'<span class="owner-badge">👑 DONO</span>');return `<article class="card"><h3>${esc(r[title]||"Sem título")}</h3><p>${esc(typeof body==="function"?body(r):(r[body]||""))}</p><div class="meta">${safeMeta}</div></article>`}).join(""):`<div class="empty">Ainda não há registros.</div>`}
 
 async function insert(formEl, table, map, extra = {}) {
   const btn = formEl.querySelector("button");
@@ -101,9 +107,38 @@ async function render(){
  const c=$("content");c.innerHTML="<p>Carregando...</p>";say("");
  try{
  if(tab==="home"){c.innerHTML=`<p class="eyebrow">RESUMO</p><h2>Olá, ${esc(profile.full_name||user.email)}!</h2><p class="muted">Seu perfil é <span class="pill">${esc(roleLabel(profile.role))}</span>.</p><div class="card"><h3>O que você pode fazer?</h3><p>${staff()?"Publicar avisos, cadastrar eventos e organizar atividades escolares.":"Consultar avisos, calendário e informações liberadas para seu perfil."}</p></div><p class="small muted">Se seu cargo estiver incorreto, peça à direção para ajustar seu perfil. O aplicativo não permite que cada pessoa mude o próprio cargo.</p>`}
- if(tab==="notices"){let rows=await load("notices");c.innerHTML=`<h2>Avisos e comunicados</h2><p class="muted">Publicações oficiais da escola.</p>`+(staff()?form("Publicar aviso",[{name:"title",label:"Título"},{name:"content",label:"Comunicado",type:"textarea"}]):"")+cards(rows,"title","content",r=>`${r.author_name||"Escola"} · ${when(r.created_at)}`);if(staff())bind("notices",{title:"title",content:"content"},{author_name:profile.full_name||user.email})}
- if(tab==="events"){let rows=await load("school_events");c.innerHTML=`<h2>Calendário escolar</h2><p class="muted">Reuniões, provas, festas e datas importantes.</p>`+(staff()?form("Cadastrar evento",[{name:"title",label:"Nome do evento"},{name:"event_date",label:"Data e hora",type:"datetime-local"},{name:"description",label:"Descrição",type:"textarea",required:false}]):"")+cards(rows,"title","description",r=>`Data: ${when(r.event_date)}`);if(staff())bind("school_events",{title:"title",event_date:"event_date",description:"description"})}
- if(tab==="messages"){let rows=await load("messages");c.innerHTML=`<h2>Mensagens</h2><p class="muted">Mural básico para comunicação entre usuários autenticados. Não é chat privado.</p>`+form("Enviar mensagem",[{name:"content",label:"Mensagem",type:"textarea"}])+cards(rows,"sender_name","content",r=>when(r.created_at));bind("messages",{content:"content"},{sender_name:profile.full_name||user.email})}
+ if(tab==="account"){
+   const classes=[
+     "6º ano","7º ano","8º ano","9º ano",
+     "1º ano do Ensino Médio","2º ano do Ensino Médio","3º ano do Ensino Médio",
+     "EJA","Outra turma"
+   ];
+   c.innerHTML=`<h2>Minha conta</h2><p class="muted">Atualize seus dados pessoais e escolares. Seu cargo não pode ser alterado por esta tela.</p><div class="formbox"><form id="account-form"><label>Nome completo<input name="full_name" maxlength="100" required value="${esc(profile.full_name||"")}" autocomplete="name"></label><label>Data de nascimento<input name="date_of_birth" type="date" value="${esc(profile.date_of_birth||"")}" autocomplete="bday"></label><label>Minha sala/turma<select name="class_name"><option value="">Selecione sua turma...</option>${classes.map(v=>`<option value="${esc(v)}" ${profile.class_name===v?"selected":""}>${esc(v)}</option>`).join("")}</select></label><button type="submit">Salvar alterações</button><p id="account-msg" class="muted" role="status"></p></form></div>`;
+   const af=$("account-form");
+   af.addEventListener("submit",async e=>{
+     e.preventDefault();
+     const btn=af.querySelector("button"); btn.disabled=true;
+     const fd=new FormData(af);
+     const name=String(fd.get("full_name")||"").trim();
+     const dob=String(fd.get("date_of_birth")||"")||null;
+     const className=String(fd.get("class_name")||"")||null;
+     const status=$("account-msg");
+     if(!name){status.textContent="Digite seu nome completo.";btn.disabled=false;return}
+     if(dob && dob>new Date().toISOString().slice(0,10)){status.textContent="A data de nascimento não pode ser futura.";btn.disabled=false;return}
+     try{
+       const {data,error}=await sb.from("profiles").update({full_name:name,date_of_birth:dob,class_name:className}).eq("id",user.id).select("id,full_name,role,date_of_birth,class_name").maybeSingle();
+       if(error)throw error;
+       if(!data)throw new Error("Não foi possível salvar. Confira se seu perfil existe e se as permissões de atualização estão configuradas.");
+       profile={...profile,...data};
+       $("hello").innerHTML=`Olá, ${esc(profile.full_name||user.email)}! ${isOwner()?'<span class="owner-badge">👑 DONO</span>':""}`;
+       status.textContent="Dados salvos com sucesso!";
+     }catch(err){status.textContent=friendly(err);}
+     finally{btn.disabled=false}
+   });
+ }
+ if(tab==="notices"){let rows=await load("notices");c.innerHTML=`<h2>Avisos e comunicados</h2><p class="muted">Publicações oficiais da escola.</p>`+(staff()?form("Publicar aviso",[{name:"title",label:"Título"},{name:"content",label:"Comunicado",type:"textarea"}]):"")+cards(rows,"title","content",r=>authorMeta(r,"author_id","author_name",r.created_at));if(staff())bind("notices",{title:"title",content:"content"},{author_name:profile.full_name||user.email})}
+ if(tab==="events"){let rows=await load("school_events");c.innerHTML=`<h2>Calendário escolar</h2><p class="muted">Reuniões, provas, festas e datas importantes.</p>`+(staff()?form("Cadastrar evento",[{name:"title",label:"Nome do evento"},{name:"event_date",label:"Data e hora",type:"datetime-local"},{name:"description",label:"Descrição",type:"textarea",required:false}]):"")+cards(rows,"title","description",r=>`${authorMeta(r,"author_id","author_name",r.event_date)}`);if(staff())bind("school_events",{title:"title",event_date:"event_date",description:"description"})}
+ if(tab==="messages"){let rows=await load("messages");c.innerHTML=`<h2>Mensagens</h2><p class="muted">Mural básico para comunicação entre usuários autenticados. Não é chat privado.</p>`+form("Enviar mensagem",[{name:"content",label:"Mensagem",type:"textarea"}])+cards(rows,"sender_name","content",r=>authorMeta(r,"sender_id","sender_name",r.created_at));bind("messages",{content:"content"},{sender_name:profile.full_name||user.email})}
  if(tab==="files"){let rows=await load("school_files");c.innerHTML=`<h2>Documentos e arquivos</h2><p class="muted">Cadastro de links para documentos. Use somente links autorizados.</p>`+(staff()?form("Adicionar documento",[{name:"title",label:"Nome do documento"},{name:"file_url",label:"Link do arquivo",type:"url"},{name:"description",label:"Descrição",required:false}]):"")+cards(rows,"title",r=>r.description||r.file_url,r=>r.file_url||"");if(staff())bind("school_files",{title:"title",file_url:"file_url",description:"description"})}
  
 if (tab === "attendance") {
@@ -225,7 +260,7 @@ if (tab === "grades") {
  if(tab==="users"&&admin()){let rows=await load("profiles");c.innerHTML=`<h2>Perfis de usuários</h2><p class="muted">Ajuste os cargos em Supabase → Editor de tabelas → profiles. O usuário não pode mudar o próprio cargo.</p>`+cards(rows,"full_name",r=>r.email||"",r=>roleLabel(r.role))}
  }catch(e){c.innerHTML=`<div class="empty"><b>Não foi possível carregar esta área.</b><p>${esc(friendly(e))}</p></div>`}
 }
-async function show(session){if(!session){$("auth").hidden=false;$("app").hidden=true;return}user=session.user;await getProfile();$("auth").hidden=true;$("app").hidden=false$("hello").innerHTML=`Olá, ${esc(profile.full_name||user.email)}! ${isOwner()?'<span class="owner-badge">👑 DONO</span>':""}`;
+async function show(session){if(!session){$("auth").hidden=false;$("app").hidden=true;return}user=session.user;await getProfile();$("auth").hidden=true;$("app").hidden=false;$("hello").innerHTML=`Olá, ${esc(profile.full_name||user.email)}! ${isOwner()?'<span class="owner-badge">👑 DONO</span>':""}`;
  const isRoleUnknown=!labels[normRole(profile.role)];$("role-alert").hidden=!isRoleUnknown;if(isRoleUnknown)$("role-alert").textContent="Seu perfil tem um cargo não reconhecido. Peça à direção para corrigir a coluna role na tabela profiles.";
  tab="home";await render()}
 async function init(){
