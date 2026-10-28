@@ -135,35 +135,6 @@ async function render(){
      }catch(err){status.textContent=friendly(err);}
      finally{btn.disabled=false}
    });
-   // Solicitação de acesso como professor para contas que ainda não são da equipe.
-   if(!staff()){
-     const {data:reqRows,error:reqError}=await sb.from("teacher_access_requests").select("id,status,message,created_at,review_note").eq("user_id",user.id).order("created_at",{ascending:false}).limit(1);
-     if(reqError)throw reqError;
-     const latest=(reqRows||[])[0];
-     const requestBox=document.createElement("section");
-     requestBox.className="formbox";
-     if(latest?.status==="pending"){
-       requestBox.innerHTML=`<h3>Solicitação para ser professor</h3><p>Você já enviou uma solicitação em ${esc(when(latest.created_at))}. Ela está aguardando análise do dono do aplicativo.</p><p class="pill">Status: Pendente</p>`;
-     }else if(latest?.status==="approved"){
-       requestBox.innerHTML=`<h3>Solicitação para ser professor</h3><p class="pill">Status: Aprovada</p><p>Seu pedido foi aprovado. Saia da conta e entre novamente para atualizar seu acesso.</p>`;
-     }else{
-       requestBox.innerHTML=`<h3>Solicitar acesso como professor</h3><p class="muted">Explique brevemente por que precisa de acesso de professor. A solicitação será enviada ao dono do aplicativo, que decidirá se aprova ou rejeita.</p>${latest?.status==="rejected"?`<p class="pill">Sua solicitação anterior foi rejeitada.${latest.review_note?` Motivo: ${esc(latest.review_note)}`:" Você pode enviar uma nova solicitação."}</p>`:""}<form id="teacher-request-form"><label>Mensagem (opcional)<textarea name="message" maxlength="1000" placeholder="Ex.: Sou professor(a) da escola e preciso publicar avisos e atividades."></textarea></label><button type="submit">Enviar solicitação</button><p id="teacher-request-msg" class="muted" role="status"></p></form>`;
-       const requestForm=requestBox.querySelector("#teacher-request-form");
-       requestForm.addEventListener("submit",async ev=>{
-         ev.preventDefault();
-         const btn=requestForm.querySelector("button");btn.disabled=true;
-         const status=requestForm.querySelector("#teacher-request-msg");
-         try{
-           const message=String(new FormData(requestForm).get("message")||"").trim()||null;
-           const {error:insertError}=await sb.from("teacher_access_requests").insert({user_id:user.id,message,status:"pending"});
-           if(insertError)throw insertError;
-           say("Solicitação enviada ao dono do aplicativo.");
-           await render();
-         }catch(err){status.textContent=friendly(err);btn.disabled=false}
-       });
-     }
-     c.appendChild(requestBox);
-   }
  }
  if(tab==="notices"){let rows=await load("notices");c.innerHTML=`<h2>Avisos e comunicados</h2><p class="muted">Publicações oficiais da escola.</p>`+(staff()?form("Publicar aviso",[{name:"title",label:"Título"},{name:"content",label:"Comunicado",type:"textarea"}]):"")+cards(rows,"title","content",r=>authorMeta(r,"author_id","author_name",r.created_at));if(staff())bind("notices",{title:"title",content:"content"},{author_name:profile.full_name||user.email})}
  if(tab==="events"){let rows=await load("school_events");c.innerHTML=`<h2>Calendário escolar</h2><p class="muted">Reuniões, provas, festas e datas importantes.</p>`+(staff()?form("Cadastrar evento",[{name:"title",label:"Nome do evento"},{name:"event_date",label:"Data e hora",type:"datetime-local"},{name:"description",label:"Descrição",type:"textarea",required:false}]):"")+cards(rows,"title","description",r=>`${authorMeta(r,"author_id","author_name",r.event_date)}`);if(staff())bind("school_events",{title:"title",event_date:"event_date",description:"description"})}
