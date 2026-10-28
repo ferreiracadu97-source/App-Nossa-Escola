@@ -108,21 +108,30 @@ async function render(){
  try{
  if(tab==="home"){c.innerHTML=`<p class="eyebrow">RESUMO</p><h2>Olá, ${esc(profile.full_name||user.email)}!</h2><p class="muted">Seu perfil é <span class="pill">${esc(roleLabel(profile.role))}</span>.</p><div class="card"><h3>O que você pode fazer?</h3><p>${staff()?"Publicar avisos, cadastrar eventos e organizar atividades escolares.":"Consultar avisos, calendário e informações liberadas para seu perfil."}</p></div><p class="small muted">Se seu cargo estiver incorreto, peça à direção para ajustar seu perfil. O aplicativo não permite que cada pessoa mude o próprio cargo.</p>`}
  if(tab==="account"){
-   c.innerHTML=`<h2>Minha conta</h2><p class="muted">Escolha o nome que aparecerá no App Nossa Escola. Seu cargo não pode ser alterado por esta tela.</p><div class="formbox"><form id="account-form"><label>Nome completo<input name="full_name" maxlength="100" required value="${esc(profile.full_name||"")}" autocomplete="name"></label><button type="submit">Salvar nome</button><p id="account-msg" class="muted" role="status"></p></form></div>`;
+   const classes=[
+     "6º ano","7º ano","8º ano","9º ano",
+     "1º ano do Ensino Médio","2º ano do Ensino Médio","3º ano do Ensino Médio",
+     "EJA","Outra turma"
+   ];
+   c.innerHTML=`<h2>Minha conta</h2><p class="muted">Atualize seus dados pessoais e escolares. Seu cargo não pode ser alterado por esta tela.</p><div class="formbox"><form id="account-form"><label>Nome completo<input name="full_name" maxlength="100" required value="${esc(profile.full_name||"")}" autocomplete="name"></label><label>Data de nascimento<input name="date_of_birth" type="date" value="${esc(profile.date_of_birth||"")}" autocomplete="bday"></label><label>Minha sala/turma<select name="class_name"><option value="">Selecione sua turma...</option>${classes.map(v=>`<option value="${esc(v)}" ${profile.class_name===v?"selected":""}>${esc(v)}</option>`).join("")}</select></label><button type="submit">Salvar alterações</button><p id="account-msg" class="muted" role="status"></p></form></div>`;
    const af=$("account-form");
    af.addEventListener("submit",async e=>{
      e.preventDefault();
      const btn=af.querySelector("button"); btn.disabled=true;
-     const name=new FormData(af).get("full_name").trim();
+     const fd=new FormData(af);
+     const name=String(fd.get("full_name")||"").trim();
+     const dob=String(fd.get("date_of_birth")||"")||null;
+     const className=String(fd.get("class_name")||"")||null;
      const status=$("account-msg");
-     if(!name){status.textContent="Digite seu nome.";btn.disabled=false;return}
+     if(!name){status.textContent="Digite seu nome completo.";btn.disabled=false;return}
+     if(dob && dob>new Date().toISOString().slice(0,10)){status.textContent="A data de nascimento não pode ser futura.";btn.disabled=false;return}
      try{
-       const {data,error}=await sb.from("profiles").update({full_name:name}).eq("id",user.id).select("id,full_name,role").maybeSingle();
+       const {data,error}=await sb.from("profiles").update({full_name:name,date_of_birth:dob,class_name:className}).eq("id",user.id).select("id,full_name,role,date_of_birth,class_name").maybeSingle();
        if(error)throw error;
-       if(!data)throw new Error("Não foi possível atualizar o perfil. Confirme se existe uma linha desta conta na tabela profiles e se a política permite alterar o próprio nome.");
+       if(!data)throw new Error("Não foi possível salvar. Confira se seu perfil existe e se as permissões de atualização estão configuradas.");
        profile={...profile,...data};
        $("hello").innerHTML=`Olá, ${esc(profile.full_name||user.email)}! ${isOwner()?'<span class="owner-badge">👑 DONO</span>':""}`;
-       status.textContent="Nome salvo com sucesso!";
+       status.textContent="Dados salvos com sucesso!";
      }catch(err){status.textContent=friendly(err);}
      finally{btn.disabled=false}
    });
