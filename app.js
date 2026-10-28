@@ -39,7 +39,13 @@ function form(title, fields, button = "Salvar") {
   }<button>${button}</button></form></div>`;
 }
 
-function cards(rows,title,body,meta){return rows.length?rows.map(r=>`<article class="card"><h3>${esc(r[title]||"Sem título")}</h3><p>${esc(typeof body==="function"?body(r):(r[body]||""))}</p><div class="meta">${esc(typeof meta==="function"?meta(r):(r[meta]||""))}</div></article>`).join(""):`<div class="empty">Ainda não há registros.</div>`}
+const OWNER_BADGE_MARKER="__OWNER_BADGE_MARKER__";
+function authorMeta(row,idField,nameField,dateValue){
+  const owner=(row[idField]===OWNER_ID);
+  const name=row[nameField]||(row[idField]===user?.id?profile?.full_name:"")||"Escola";
+  return `${name}${owner?OWNER_BADGE_MARKER:""}${dateValue?` · ${when(dateValue)}`:""}`;
+}
+function cards(rows,title,body,meta){return rows.length?rows.map(r=>{const rawMeta=typeof meta==="function"?meta(r):(r[meta]||"");const safeMeta=esc(rawMeta).replaceAll(esc(OWNER_BADGE_MARKER),'<span class="owner-badge">👑 DONO</span>');return `<article class="card"><h3>${esc(r[title]||"Sem título")}</h3><p>${esc(typeof body==="function"?body(r):(r[body]||""))}</p><div class="meta">${safeMeta}</div></article>`}).join(""):`<div class="empty">Ainda não há registros.</div>`}
 
 async function insert(formEl, table, map, extra = {}) {
   const btn = formEl.querySelector("button");
@@ -121,9 +127,9 @@ async function render(){
      finally{btn.disabled=false}
    });
  }
- if(tab==="notices"){let rows=await load("notices");c.innerHTML=`<h2>Avisos e comunicados</h2><p class="muted">Publicações oficiais da escola.</p>`+(staff()?form("Publicar aviso",[{name:"title",label:"Título"},{name:"content",label:"Comunicado",type:"textarea"}]):"")+cards(rows,"title","content",r=>`${r.author_name||"Escola"} · ${when(r.created_at)}`);if(staff())bind("notices",{title:"title",content:"content"},{author_name:profile.full_name||user.email})}
- if(tab==="events"){let rows=await load("school_events");c.innerHTML=`<h2>Calendário escolar</h2><p class="muted">Reuniões, provas, festas e datas importantes.</p>`+(staff()?form("Cadastrar evento",[{name:"title",label:"Nome do evento"},{name:"event_date",label:"Data e hora",type:"datetime-local"},{name:"description",label:"Descrição",type:"textarea",required:false}]):"")+cards(rows,"title","description",r=>`Data: ${when(r.event_date)}`);if(staff())bind("school_events",{title:"title",event_date:"event_date",description:"description"})}
- if(tab==="messages"){let rows=await load("messages");c.innerHTML=`<h2>Mensagens</h2><p class="muted">Mural básico para comunicação entre usuários autenticados. Não é chat privado.</p>`+form("Enviar mensagem",[{name:"content",label:"Mensagem",type:"textarea"}])+cards(rows,"sender_name","content",r=>when(r.created_at));bind("messages",{content:"content"},{sender_name:profile.full_name||user.email})}
+ if(tab==="notices"){let rows=await load("notices");c.innerHTML=`<h2>Avisos e comunicados</h2><p class="muted">Publicações oficiais da escola.</p>`+(staff()?form("Publicar aviso",[{name:"title",label:"Título"},{name:"content",label:"Comunicado",type:"textarea"}]):"")+cards(rows,"title","content",r=>authorMeta(r,"author_id","author_name",r.created_at));if(staff())bind("notices",{title:"title",content:"content"},{author_name:profile.full_name||user.email})}
+ if(tab==="events"){let rows=await load("school_events");c.innerHTML=`<h2>Calendário escolar</h2><p class="muted">Reuniões, provas, festas e datas importantes.</p>`+(staff()?form("Cadastrar evento",[{name:"title",label:"Nome do evento"},{name:"event_date",label:"Data e hora",type:"datetime-local"},{name:"description",label:"Descrição",type:"textarea",required:false}]):"")+cards(rows,"title","description",r=>`${authorMeta(r,"author_id","author_name",r.event_date)}`);if(staff())bind("school_events",{title:"title",event_date:"event_date",description:"description"})}
+ if(tab==="messages"){let rows=await load("messages");c.innerHTML=`<h2>Mensagens</h2><p class="muted">Mural básico para comunicação entre usuários autenticados. Não é chat privado.</p>`+form("Enviar mensagem",[{name:"content",label:"Mensagem",type:"textarea"}])+cards(rows,"sender_name","content",r=>authorMeta(r,"sender_id","sender_name",r.created_at));bind("messages",{content:"content"},{sender_name:profile.full_name||user.email})}
  if(tab==="files"){let rows=await load("school_files");c.innerHTML=`<h2>Documentos e arquivos</h2><p class="muted">Cadastro de links para documentos. Use somente links autorizados.</p>`+(staff()?form("Adicionar documento",[{name:"title",label:"Nome do documento"},{name:"file_url",label:"Link do arquivo",type:"url"},{name:"description",label:"Descrição",required:false}]):"")+cards(rows,"title",r=>r.description||r.file_url,r=>r.file_url||"");if(staff())bind("school_files",{title:"title",file_url:"file_url",description:"description"})}
  
 if (tab === "attendance") {
