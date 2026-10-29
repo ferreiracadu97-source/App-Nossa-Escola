@@ -317,4 +317,122 @@ if (tab === "grades") {
  if(tab==="users"&&admin()){let rows=await load("profiles");c.innerHTML=`<h2>Perfis de usuários</h2><p class="muted">Ajuste os cargos em Supabase → Editor de tabelas → profiles. O usuário não pode mudar o próprio cargo.</p>`+cards(rows,"full_name",r=>r.email||"",r=>roleLabel(r.role))}
  }catch(e){c.innerHTML=`<div class="empty"><b>Não foi possível carregar esta área.</b><p>${esc(friendly(e))}</p></div>`}
 }
-async function show(session){if(!session){$("auth").hidden=false;$("app").hidden=true;return}user=session.user;await getPro
+async function show(session) {
+  if (!session) {
+    $("auth").hidden = false;
+    $("app").hidden = true;
+    $("account-icon").hidden = true;
+    return;
+  }
+
+  user = session.user;
+  await getProfile();
+
+  $("auth").hidden = true;
+  $("app").hidden = false;
+  $("account-icon").hidden = false;
+
+  $("hello").innerHTML =
+    `Olá, ${esc(profile.full_name || user.email)}! ${
+      isOwner() ? '<span class="owner-badge">👑 DONO</span>' : ""
+    }`;
+
+  const isRoleUnknown = !labels[normRole(profile.role)];
+  $("role-alert").hidden = !isRoleUnknown;
+
+  if (isRoleUnknown) {
+    $("role-alert").textContent =
+      "Seu perfil tem um cargo não reconhecido. Peça à direção para corrigir a coluna role na tabela profiles.";
+  }
+
+  tab = "home";
+  await render();
+}
+
+async function init() {
+  if (
+    !cfg.SUPABASE_URL ||
+    cfg.SUPABASE_URL.includes("SEU-PROJETO") ||
+    !cfg.SUPABASE_ANON_KEY ||
+    cfg.SUPABASE_ANON_KEY.includes("COLE_AQUI")
+  ) {
+    say("Configure config.js com a URL e a chave anon/public do Supabase.", true, "authmsg");
+    return;
+  }
+
+  sb = window.supabase.createClient(
+    cfg.SUPABASE_URL,
+    cfg.SUPABASE_ANON_KEY
+  );
+
+  $("login").onclick = async () => {
+    try {
+      say("", false, "authmsg");
+      const { error } = await sb.auth.signInWithPassword({
+        email: $("email").value.trim(),
+        password: $("password").value
+      });
+      if (error) throw error;
+    } catch (e) {
+      say(friendly(e), true, "authmsg");
+    }
+  };
+
+  $("signup").onclick = async () => {
+    try {
+      say("", false, "authmsg");
+      const { data, error } = await sb.auth.signUp({
+        email: $("email").value.trim(),
+        password: $("password").value,
+        options: {
+          data: { full_name: $("email").value.split("@")[0] }
+        }
+      });
+      if (error) throw error;
+      say(
+        data.session
+          ? "Conta criada."
+          : "Conta criada. Confira seu e-mail para confirmar.",
+        false,
+        "authmsg"
+      );
+    } catch (e) {
+      say(friendly(e), true, "authmsg");
+    }
+  };
+
+  $("reset").onclick = async () => {
+    try {
+      const em = $("email").value.trim();
+      if (!em) throw Error("Digite seu e-mail primeiro.");
+      const { error } = await sb.auth.resetPasswordForEmail(em);
+      if (error) throw error;
+      say("Se o e-mail estiver cadastrado, você receberá instruções.", false, "authmsg");
+    } catch (e) {
+      say(friendly(e), true, "authmsg");
+    }
+  };
+
+  $("logout").onclick = async () => {
+    await sb.auth.signOut();
+  };
+
+  $("account-icon").onclick = () => {
+    tab = "account";
+    render();
+    document.getElementById("content").scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  };
+
+  sb.auth.onAuthStateChange((_event, session) => {
+    setTimeout(() => show(session).catch(e => say(friendly(e), true)), 0);
+  });
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) await show(session);
+}
+
+document.addEventListener("DOMContentLoaded", init);
+})();
