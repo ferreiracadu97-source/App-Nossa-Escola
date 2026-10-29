@@ -1,42 +1,3 @@
-(() => {
-const $=id=>document.getElementById(id), cfg=window.APP_CONFIG||{};
-let sb,user,profile,tab="home";
- const OWNER_ID="575779b7-dc46-4252-b362-c9dc94bf0a68";
-const isOwner=()=>user?.id===OWNER_ID;
-const labels={teacher:"Professor(a)",professor:"Professor(a)",professora:"Professor(a)",director:"Direção",diretor:"Direção",diretora:"Direção",admin:"Administrador(a)",administrator:"Administrador(a)",guardian:"Responsável",responsavel:"Responsável",responsável:"Responsável",parent:"Responsável",student:"Aluno(a)",aluno:"Aluno(a)",aluna:"Aluno(a)"};
-function normRole(raw){let r=String(raw||"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[\s-]+/g,"_");const map={professor:"teacher",professora:"teacher",docente:"teacher",diretor:"director",diretora:"director",direcao:"director",coordenador:"director",coordenadora:"director",administrador:"admin",administradora:"admin",responsavel:"guardian",pai:"guardian",mae:"guardian",encarregado:"guardian",encarregada:"guardian",aluno:"student",aluna:"student",estudante:"student"};return map[r]||r||"guardian"}
-const staff=()=>isOwner()||["teacher","director","admin"].includes(normRole(profile?.role));
-const admin=()=>isOwner()||["director","admin"].includes(normRole(profile?.role));
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const say=(s,err=false,where="appmsg")=>{const e=$(where);e.textContent=s||"";e.classList.toggle("error",!!err)};
-const roleLabel=r=>labels[normRole(r)]||String(r||"Acesso pendente");
-function when(s){if(!s)return "";let d=new Date(s);return isNaN(d)?esc(s):d.toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}
-function staffTabs(){return [
-{id:"home",label:"Início"},{id:"account",label:"Minha conta"},{id:"notices",label:"Avisos"},{id:"events",label:"Calendário"},{id:"messages",label:"Mensagens"},{id:"files",label:"Documentos"},{id:"attendance",label:"Frequência"},{id:"grades",label:"Notas/boletim"},{id:"tasks",label:"Atividades"},...(isOwner()?[{id:"teacher-requests",label:"Solicitações de professor"}]:[]),...(admin()?[{id:"users",label:"Usuários"}]:[])
-]}
-async function getProfile(){
- const {data,error}=await sb.from("profiles").select("*").eq("id",user.id).maybeSingle();
- if(error)throw error;
- profile=data||{id:user.id,email:user.email,full_name:user.email,role:"guardian"};
- profile.role=normRole(profile.role);
-}
-async function load(table, order="created_at"){const {data,error}=await sb.from(table).select("*").order(order,{ascending:false}).limit(100);if(error)throw error;return data||[]}
-
-function form(title, fields, button = "Salvar") {
-  return `<div class="formbox"><h3>${title}</h3><form class="entryform">${
-    fields.map(f => `<label>${f.label}${
-      f.type === "textarea"
-        ? `<textarea name="${f.name}" ${f.required === false ? "" : "required"}></textarea>`
-        : f.type === "select"
-          ? `<select name="${f.name}" ${f.required === false ? "" : "required"}>
-              <option value="">Selecione...</option>
-              ${(f.options || []).map(o =>
-                `<option value="${o.value}">${o.label}</option>`
-              ).join("")}
-            </select>`
-          : `<input name="${f.name}" type="${f.type || "text"}" ${f.required === false ? "" : "required"} ${f.step ? `step="${f.step}"` : ""}>`
-    }</label>`).join("")
-  }<button>${button}</button></form></div>`;
 }
 
 const OWNER_BADGE_MARKER="__OWNER_BADGE_MARKER__";
@@ -318,4 +279,19 @@ if (tab === "grades") {
  if(tab==="users"&&admin()){let rows=await load("profiles");c.innerHTML=`<h2>Perfis de usuários</h2><p class="muted">Ajuste os cargos em Supabase → Editor de tabelas → profiles. O usuário não pode mudar o próprio cargo.</p>`+cards(rows,"full_name",r=>r.email||"",r=>roleLabel(r.role))}
  }catch(e){c.innerHTML=`<div class="empty"><b>Não foi possível carregar esta área.</b><p>${esc(friendly(e))}</p></div>`}
 }
-async function show(session){if(!session){$("auth").hidden=false;$(
+async function show(session){if(!session){$("auth").hidden=false;$("app").hidden=true;$("account-icon").hidden=true;return}user=session.user;await getProfile();$("auth").hidden=true;$("app").hidden=false;$("account-icon").hidden=false;$("hello").innerHTML=`Olá, ${esc(profile.full_name||user.email)}! ${isOwner()?'<span class="owner-badge">👑 DONO</span>':""}`;
+ const isRoleUnknown=!labels[normRole(profile.role)];$("role-alert").hidden=!isRoleUnknown;if(isRoleUnknown)$("role-alert").textContent="Seu perfil tem um cargo não reconhecido. Peça à direção para corrigir a coluna role na tabela profiles.";
+ tab="home";await render()}
+async function init(){
+ if(!cfg.SUPABASE_URL||cfg.SUPABASE_URL.includes("SEU-PROJETO")||!cfg.SUPABASE_ANON_KEY||cfg.SUPABASE_ANON_KEY.includes("COLE_AQUI")){say("Configure config.js com a URL e a chave anon/public do Supabase.","true","authmsg");return}
+ sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);
+ $("login").onclick=async()=>{say("","false","authmsg");const {error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(error)say(friendly(error),true,"authmsg")};
+ $("signup").onclick=async()=>{try{say("","false","authmsg");const {data,error}=await sb.auth.signUp({email:$("email").value.trim(),password:$("password").value,options:{data:{full_name:$("email").value.split("@")[0]}}});if(error)throw error;say(data.session?"Conta criada.":"Conta criada. Confira seu e-mail para confirmar.",false,"authmsg")}catch(e){say(friendly(e),true,"authmsg")}};
+ $("reset").onclick=async()=>{try{const em=$("email").value.trim();if(!em)throw Error("Digite seu e-mail primeiro.");const {error}=await sb.auth.resetPasswordForEmail(em);if(error)throw error;say("Se o e-mail estiver cadastrado, você receberá instruções.",false,"authmsg")}catch(e){say(friendly(e),true,"authmsg")}};
+ $("logout").onclick=async()=>{await sb.auth.signOut()};
+ $("account-icon").onclick=()=>{tab="account";render();document.getElementById("content").scrollIntoView({behavior:"smooth",block:"start"})};
+ sb.auth.onAuthStateChange((_event,session)=>{setTimeout(()=>show(session).catch(e=>say(friendly(e),true)),0)});
+ const {data:{session}}=await sb.auth.getSession();if(session)await show(session)
+}
+document.addEventListener("DOMContentLoaded",init);
+})();
