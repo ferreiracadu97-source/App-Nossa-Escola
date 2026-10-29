@@ -109,8 +109,9 @@ async function render(){
  if(tab==="home"){c.innerHTML=`<p class="eyebrow">RESUMO</p><h2>Olá, ${esc(profile.full_name||user.email)}!</h2><p class="muted">Seu perfil é <span class="pill">${esc(roleLabel(profile.role))}</span>.</p><div class="card"><h3>O que você pode fazer?</h3><p>${staff()?"Publicar avisos, cadastrar eventos e organizar atividades escolares.":"Consultar avisos, calendário e informações liberadas para seu perfil."}</p></div><p class="small muted">Se seu cargo estiver incorreto, peça à direção para ajustar seu perfil. O aplicativo não permite que cada pessoa mude o próprio cargo.</p>`}
  if(tab==="account"){
    const classes=[
-     "1º ano","2º ano","3º ano","4º ano","5º ano",
-     "6º ano","7º ano","8º ano","9º ano"
+     "6º ano","7º ano","8º ano","9º ano",
+     "1º ano do Ensino Médio","2º ano do Ensino Médio","3º ano do Ensino Médio",
+     "EJA","Outra turma"
    ];
    c.innerHTML=`<h2>Minha conta</h2><p class="muted">Atualize seus dados pessoais e escolares. Seu cargo não pode ser alterado por esta tela.</p><div class="formbox"><form id="account-form"><label>Nome completo<input name="full_name" maxlength="100" required value="${esc(profile.full_name||"")}" autocomplete="name"></label><label>Data de nascimento<input name="date_of_birth" type="date" value="${esc(profile.date_of_birth||"")}" autocomplete="bday"></label><label>Minha sala/turma<select name="class_name"><option value="">Selecione sua turma...</option>${classes.map(v=>`<option value="${esc(v)}" ${profile.class_name===v?"selected":""}>${esc(v)}</option>`).join("")}</select></label><button type="submit">Salvar alterações</button><p id="account-msg" class="muted" role="status"></p></form></div>`;
    const af=$("account-form");
@@ -317,4 +318,4 @@ if (tab === "grades") {
  if(tab==="users"&&admin()){let rows=await load("profiles");c.innerHTML=`<h2>Perfis de usuários</h2><p class="muted">Ajuste os cargos em Supabase → Editor de tabelas → profiles. O usuário não pode mudar o próprio cargo.</p>`+cards(rows,"full_name",r=>r.email||"",r=>roleLabel(r.role))}
  }catch(e){c.innerHTML=`<div class="empty"><b>Não foi possível carregar esta área.</b><p>${esc(friendly(e))}</p></div>`}
 }
-async function show(session){if(!session){$("auth").hidden=false;$("app").hidden=true;return}user=session.user;await getPro
+async function show(session){if(!session){$("auth").hidden=false;$(
