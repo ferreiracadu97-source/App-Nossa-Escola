@@ -434,5 +434,15 @@ async function init() {
   if (session) await show(session);
 }
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", init);document.addEventListener("DOMContentLoaded", init);
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("./service-worker.js")
+      .catch(error => console.error("Erro no Service Worker:", error));
+  });
+}
+
+})();
 })();
